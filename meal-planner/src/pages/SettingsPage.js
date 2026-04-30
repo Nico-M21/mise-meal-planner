@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, X } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Plus, X, Loader } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 const CATEGORIES = ['Oils & Fats', 'Spices & Herbs', 'Condiments & Sauces', 'Baking', 'Grains & Pasta', 'Canned & Broths', 'Produce Basics', 'Dairy Basics', 'Other'];
@@ -30,14 +30,58 @@ const DEFAULT_STAPLES = [
   { name: 'onion', category: 'Produce Basics' },
 ];
 
+async function detectCategory(ingredientName) {
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1000,
+      system: `You categorize pantry ingredients. Given an ingredient name, return ONLY one of these exact category names, nothing else:
+Oils & Fats
+Spices & Herbs
+Condiments & Sauces
+Baking
+Grains & Pasta
+Canned & Broths
+Produce Basics
+Dairy Basics
+Other`,
+      messages: [{ role: 'user', content: ingredientName }],
+    }),
+  });
+  const data = await response.json();
+  const result = data.content[0].text.trim();
+  return CATEGORIES.includes(result) ? result : 'Other';
+}
+
 export function SettingsPage({ showToast }) {
   const [staples, setStaples] = useState([]);
   const [newStaple, setNewStaple] = useState('');
-  const [newCategory, setNewCategory] = useState('Spices & Herbs');
+  const [newCategory, setNewCategory] = useState('Other');
+  const [detecting, setDetecting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [confirmDelete, setConfirmDelete] = useState(null);
+  const debounceRef = useRef(null);
 
   useEffect(() => { fetchStaples(); }, []);
+
+  // Auto-detect category as user types (debounced)
+  useEffect(() => {
+    if (!newStaple.trim() || newStaple.trim().length < 3) return;
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      setDetecting(true);
+      try {
+        const cat = await detectCategory(newStaple.trim());
+        setNewCategory(cat);
+      } catch (e) {
+        // silently fail, keep current category
+      }
+      setDetecting(false);
+    }, 600);
+    return () => clearTimeout(debounceRef.current);
+  }, [newStaple]);
 
   async function fetchStaples() {
     const { data } = await supabase.from('pantry_staples').select('*').order('category').order('name');
@@ -51,9 +95,10 @@ export function SettingsPage({ showToast }) {
     const { data, error } = await supabase.from('pantry_staples').insert([{ name: trimmed, category: newCategory }]).select();
     if (!error) {
       setStaples(prev => [...prev, data[0]].sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name)));
-      showToast(`Added ${trimmed}`, 'success');
+      showToast(`Added ${trimmed} to ${newCategory}`, 'success');
     }
     setNewStaple('');
+    setNewCategory('Other');
   }
 
   async function confirmAndDelete() {
@@ -95,22 +140,41 @@ export function SettingsPage({ showToast }) {
           <button className="btn btn-secondary btn-sm" onClick={addDefaults}>+ Add common defaults</button>
         </div>
 
+        {/* Add new */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
           <input
             className="input"
-            placeholder="Add a staple ingredient..."
+            placeholder="Type an ingredient..."
             value={newStaple}
             onChange={e => setNewStaple(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && addStaple(newStaple)}
+            onKeyDown={e => e.key === 'Enter' && !detecting && addStaple(newStaple)}
             style={{ flex: 1 }}
           />
-          <select className="input" value={newCategory} onChange={e => setNewCategory(e.target.value)} style={{ width: 'auto' }}>
-            {CATEGORIES.map(c => <option key={c}>{c}</option>)}
-          </select>
-          <button className="btn btn-primary" onClick={() => addStaple(newStaple)} disabled={!newStaple.trim()}>
+          <div style={{ position: 'relative' }}>
+            <select
+              className="input"
+              value={newCategory}
+              onChange={e => setNewCategory(e.target.value)}
+              style={{ width: 'auto', paddingRight: detecting ? 32 : 14 }}
+            >
+              {CATEGORIES.map(c => <option key={c}>{c}</option>)}
+            </select>
+            {detecting && (
+              <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
+                <span className="spinner" style={{ width: 14, height: 14 }} />
+              </div>
+            )}
+          </div>
+          <button className="btn btn-primary" onClick={() => addStaple(newStaple)} disabled={!newStaple.trim() || detecting}>
             <Plus size={16} />
           </button>
         </div>
+
+        {detecting && (
+          <p style={{ fontSize: '0.8rem', color: 'var(--ink-faint)', marginTop: -16, marginBottom: 12 }}>
+            Detecting category...
+          </p>
+        )}
 
         {loading ? (
           <div style={{ textAlign: 'center', padding: 20 }}><span className="spinner" /></div>
