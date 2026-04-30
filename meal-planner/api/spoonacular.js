@@ -36,6 +36,8 @@ module.exports = async function (req, res) {
   try {
     const { url } = req.body;
     const apiKey = process.env.SPOONACULAR_API_KEY;
+    console.log('API Key present:', !!apiKey, 'Length:', apiKey ? apiKey.length : 0);
+    console.log('URL to extract:', url);
     const endpoint = `https://api.spoonacular.com/recipes/extract?apiKey=${apiKey}&url=${encodeURIComponent(url)}&forceExtraction=false&analyze=false&includeNutrition=false`;
     const result = await httpsGet(endpoint);
     if (result.status !== 200) return res.status(result.status).json({ error: 'Extraction failed' });
