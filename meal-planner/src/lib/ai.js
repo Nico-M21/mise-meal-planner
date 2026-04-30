@@ -1,4 +1,4 @@
-const ANTHROPIC_API = 'https://api.anthropic.com/v1/messages';
+const ANTHROPIC_API = '/.netlify/functions/claude';
 const MODEL = 'claude-sonnet-4-20250514';
 
 async function callClaude(systemPrompt, userContent) {
