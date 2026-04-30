@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Link2, Upload, PenLine, ChevronRight, Plus, Minus, X } from 'lucide-react';
-import { extractRecipeFromUrl, extractRecipeFromImage, extractRecipeFromText } from '../lib/ai';
+import { Link2, Upload, PenLine, ChevronRight, Plus, X } from 'lucide-react';
+import { extractRecipeFromImage, extractRecipeFromText } from '../lib/ai';
 import { supabase } from '../lib/supabase';
 
 const BLANK_RECIPE = {
@@ -14,17 +14,18 @@ const CATEGORIES = ['Produce', 'Protein', 'Dairy', 'Pantry', 'Frozen', 'Bakery',
 const CUISINES = ['American', 'Mexican', 'Italian', 'Asian', 'Thai', 'Chinese', 'Japanese', 'Indian', 'Mediterranean', 'French', 'Greek', 'Other'];
 
 export function AddRecipePage({ onSaved, showToast }) {
-  const [mode, setMode] = useState(null); // 'url' | 'upload' | 'manual'
+  const [mode, setMode] = useState(null);
   const [loading, setLoading] = useState(false);
   const [urlInput, setUrlInput] = useState('');
+  const [pasteText, setPasteText] = useState('');
   const [recipe, setRecipe] = useState(null);
   const [saving, setSaving] = useState(false);
 
-  async function handleUrlExtract() {
-    if (!urlInput.trim()) return;
+  async function handlePasteExtract() {
+    if (!pasteText.trim()) return;
     setLoading(true);
     try {
-      const extracted = await extractRecipeFromUrl(urlInput.trim());
+      const extracted = await extractRecipeFromText(pasteText.trim());
       setRecipe({ ...BLANK_RECIPE, ...extracted, source_url: urlInput.trim() });
     } catch (e) {
       showToast('Could not extract recipe. Try manual entry.', 'error');
@@ -45,8 +46,7 @@ export function AddRecipePage({ onSaved, showToast }) {
         if (mediaType.startsWith('image/')) {
           extracted = await extractRecipeFromImage(base64, mediaType);
         } else {
-          // video - extract from text description
-          extracted = await extractRecipeFromText(`Video file uploaded: ${file.name}. Please create a recipe based on the filename context.`);
+          extracted = await extractRecipeFromText(`Video file: ${file.name}`);
         }
         setRecipe({ ...BLANK_RECIPE, ...extracted });
         setLoading(false);
@@ -113,6 +113,7 @@ export function AddRecipePage({ onSaved, showToast }) {
       setRecipe(null);
       setMode(null);
       setUrlInput('');
+      setPasteText('');
       onSaved();
     } catch (e) {
       showToast('Failed to save recipe.', 'error');
@@ -128,20 +129,17 @@ export function AddRecipePage({ onSaved, showToast }) {
           <h1 className="page-title">Add a Recipe</h1>
           <p className="page-subtitle">Import from the web, upload a photo, or type it in</p>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, maxWidth: 600 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 16, maxWidth: 600 }}>
           {[
-            { key: 'url', icon: <Link2 size={28} />, label: 'Paste a URL', sub: 'Import from any recipe website' },
-            { key: 'upload', icon: <Upload size={28} />, label: 'Upload Photo or Video', sub: 'AI extracts the recipe for you' },
+            { key: 'url', icon: <Link2 size={28} />, label: 'From a Website', sub: 'Copy & paste recipe text' },
+            { key: 'upload', icon: <Upload size={28} />, label: 'Photo or Video', sub: 'AI extracts the recipe' },
             { key: 'manual', icon: <PenLine size={28} />, label: 'Type it in', sub: 'Manual entry from scratch' },
           ].map(opt => (
-            <button
-              key={opt.key}
-              className="card"
+            <button key={opt.key} className="card"
               onClick={() => opt.key === 'manual' ? handleManual() : setMode(opt.key)}
               style={{ border: '2px solid var(--border)', background: 'var(--warm-white)', textAlign: 'center', cursor: 'pointer', padding: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, transition: 'all 0.15s' }}
               onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--terracotta)'}
-              onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
-            >
+              onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
               <div style={{ color: 'var(--terracotta)' }}>{opt.icon}</div>
               <div>
                 <div style={{ fontWeight: 600, marginBottom: 4 }}>{opt.label}</div>
@@ -154,21 +152,32 @@ export function AddRecipePage({ onSaved, showToast }) {
     );
   }
 
-  // URL input
+  // Website paste mode
   if (mode === 'url' && !recipe) {
     return (
       <div>
         <div className="page-header">
-          <h1 className="page-title">Import from URL</h1>
+          <h1 className="page-title">Import from Website</h1>
+          <p className="page-subtitle">Copy the recipe page text and paste it below</p>
         </div>
-        <div className="card" style={{ maxWidth: 520 }}>
+        <div className="card" style={{ maxWidth: 560 }}>
+          <div style={{ background: 'var(--gold-pale)', border: '1px solid var(--gold)', borderRadius: 8, padding: '12px 14px', marginBottom: 16, fontSize: '0.85rem', color: 'var(--ink-light)', lineHeight: 1.7 }}>
+            <strong>How to do it:</strong><br />
+            1. Open the recipe page in a new tab<br />
+            2. Press <strong>Ctrl+A</strong> to select all text, then <strong>Ctrl+C</strong> to copy<br />
+            3. Paste it in the box below with <strong>Ctrl+V</strong>
+          </div>
+          <div className="form-group" style={{ marginBottom: 12 }}>
+            <label className="label">Recipe URL (optional — saved for reference)</label>
+            <input className="input" placeholder="https://..." value={urlInput} onChange={e => setUrlInput(e.target.value)} />
+          </div>
           <div className="form-group" style={{ marginBottom: 16 }}>
-            <label className="label">Recipe URL</label>
-            <input className="input" placeholder="https://..." value={urlInput} onChange={e => setUrlInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleUrlExtract()} />
+            <label className="label">Paste recipe page text here *</label>
+            <textarea className="input" rows={8} placeholder="Paste the page text here..." value={pasteText}
+              onChange={e => setPasteText(e.target.value)} style={{ resize: 'vertical', fontSize: '0.85rem' }} />
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn btn-primary" onClick={handleUrlExtract} disabled={loading || !urlInput.trim()}>
+            <button className="btn btn-primary" onClick={handlePasteExtract} disabled={loading || !pasteText.trim()}>
               {loading ? <span className="spinner" /> : <><ChevronRight size={16} /> Extract Recipe</>}
             </button>
             <button className="btn btn-secondary" onClick={() => setMode(null)}>Back</button>
@@ -205,7 +214,7 @@ export function AddRecipePage({ onSaved, showToast }) {
     );
   }
 
-  // Recipe edit form (after extraction or manual)
+  // Recipe edit form
   if (recipe) {
     return (
       <div>
@@ -214,7 +223,6 @@ export function AddRecipePage({ onSaved, showToast }) {
           <p className="page-subtitle">{mode !== 'manual' ? 'AI extracted this — check it over before saving' : 'Fill in your recipe details'}</p>
         </div>
         <div style={{ display: 'grid', gap: 20, maxWidth: 760 }}>
-          {/* Basic info */}
           <div className="card">
             <h3 style={{ fontFamily: 'Playfair Display, serif', marginBottom: 16 }}>Details</h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
@@ -248,13 +256,12 @@ export function AddRecipePage({ onSaved, showToast }) {
             </div>
           </div>
 
-          {/* Ingredients */}
           <div className="card">
             <h3 style={{ fontFamily: 'Playfair Display, serif', marginBottom: 16 }}>Ingredients</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {recipe.ingredients.map((ing, i) => (
-                <div key={i} style={{ display: 'grid', gridTemplateColumns: '80px 80px 1fr 120px 32px', gap: 6, alignItems: 'center' }}>
-                  <input className="input" placeholder="Amount" value={ing.amount} onChange={e => updateIngredient(i, 'amount', e.target.value)} style={{ fontSize: '0.85rem' }} />
+                <div key={i} style={{ display: 'grid', gridTemplateColumns: '70px 70px 1fr 110px 28px', gap: 6, alignItems: 'center' }}>
+                  <input className="input" placeholder="Amt" value={ing.amount} onChange={e => updateIngredient(i, 'amount', e.target.value)} style={{ fontSize: '0.85rem' }} />
                   <input className="input" placeholder="Unit" value={ing.unit} onChange={e => updateIngredient(i, 'unit', e.target.value)} style={{ fontSize: '0.85rem' }} />
                   <input className="input" placeholder="Ingredient" value={ing.name} onChange={e => updateIngredient(i, 'name', e.target.value)} style={{ fontSize: '0.85rem' }} />
                   <select className="input" value={ing.category} onChange={e => updateIngredient(i, 'category', e.target.value)} style={{ fontSize: '0.82rem' }}>
@@ -269,7 +276,6 @@ export function AddRecipePage({ onSaved, showToast }) {
             </button>
           </div>
 
-          {/* Steps */}
           <div className="card">
             <h3 style={{ fontFamily: 'Playfair Display, serif', marginBottom: 16 }}>Steps</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -286,7 +292,6 @@ export function AddRecipePage({ onSaved, showToast }) {
             </button>
           </div>
 
-          {/* Actions */}
           <div style={{ display: 'flex', gap: 10 }}>
             <button className="btn btn-primary" onClick={saveRecipe} disabled={saving}>
               {saving ? <span className="spinner" /> : 'Save Recipe'}
