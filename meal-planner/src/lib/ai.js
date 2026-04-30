@@ -1,6 +1,6 @@
 const ANTHROPIC_API = '/.netlify/functions/claude';
 const MODEL = 'claude-sonnet-4-5';
-const MAX_TOKENS = 2000;
+const MAX_TOKENS = 3000;
 
 async function callClaude(systemPrompt, userContent) {
   const response = await fetch(ANTHROPIC_API, {
@@ -95,7 +95,14 @@ export async function extractRecipeFromText(text) {
   "ingredients": [{"name": string, "amount": string, "unit": string, "category": string}],
   "steps": [{"order": number, "instruction": string}]
 }`;
-  const truncated = text.slice(0, 6000);
+  // Find the recipe content — skip navigation/header junk
+  const markers = ["Ingredients", "ingredients", "INGREDIENTS", "Recipe", "Prep Time", "Cook Time"];
+  let start = 0;
+  for (const marker of markers) {
+    const idx = text.indexOf(marker);
+    if (idx > 0 && idx < text.length * 0.7) { start = Math.max(0, idx - 200); break; }
+  }
+  const truncated = text.slice(start, start + 10000);
   const extracted = await callClaude(system, truncated);
   return JSON.parse(extracted);
 }
