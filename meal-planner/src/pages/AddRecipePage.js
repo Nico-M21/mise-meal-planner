@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link2, Upload, PenLine, ChevronRight, Plus, X } from 'lucide-react';
-import { extractRecipeFromImage, extractRecipeFromText } from '../lib/ai';
+import { extractRecipeFromUrl, extractRecipeFromImage, extractRecipeFromText } from '../lib/ai';
 import { supabase } from '../lib/supabase';
 
 const BLANK_RECIPE = {
@@ -20,6 +20,18 @@ export function AddRecipePage({ onSaved, showToast }) {
   const [pasteText, setPasteText] = useState('');
   const [recipe, setRecipe] = useState(null);
   const [saving, setSaving] = useState(false);
+
+  async function handleUrlExtract() {
+    if (!urlInput.trim()) return;
+    setLoading(true);
+    try {
+      const extracted = await extractRecipeFromUrl(urlInput.trim());
+      setRecipe({ ...BLANK_RECIPE, ...extracted, source_url: urlInput.trim() });
+    } catch (e) {
+      showToast('Could not extract recipe. Try manual entry.', 'error');
+    }
+    setLoading(false);
+  }
 
   async function handlePasteExtract() {
     if (!pasteText.trim()) return;
@@ -152,33 +164,24 @@ export function AddRecipePage({ onSaved, showToast }) {
     );
   }
 
-  // Website paste mode
+  // URL import mode
   if (mode === 'url' && !recipe) {
     return (
       <div>
         <div className="page-header">
           <h1 className="page-title">Import from Website</h1>
-          <p className="page-subtitle">Copy the recipe page text and paste it below</p>
+          <p className="page-subtitle">Paste the recipe URL and we'll extract it automatically</p>
         </div>
-        <div className="card" style={{ maxWidth: 560 }}>
-          <div style={{ background: 'var(--gold-pale)', border: '1px solid var(--gold)', borderRadius: 8, padding: '12px 14px', marginBottom: 16, fontSize: '0.85rem', color: 'var(--ink-light)', lineHeight: 1.7 }}>
-            <strong>How to do it:</strong><br />
-            1. Open the recipe page in a new tab<br />
-            2. Press <strong>Ctrl+A</strong> to select all text, then <strong>Ctrl+C</strong> to copy<br />
-            3. Paste it in the box below with <strong>Ctrl+V</strong>
-          </div>
-          <div className="form-group" style={{ marginBottom: 12 }}>
-            <label className="label">Recipe URL (optional — saved for reference)</label>
-            <input className="input" placeholder="https://..." value={urlInput} onChange={e => setUrlInput(e.target.value)} />
-          </div>
+        <div className="card" style={{ maxWidth: 520 }}>
           <div className="form-group" style={{ marginBottom: 16 }}>
-            <label className="label">Paste recipe page text here *</label>
-            <textarea className="input" rows={8} placeholder="Paste the page text here..." value={pasteText}
-              onChange={e => setPasteText(e.target.value)} style={{ resize: 'vertical', fontSize: '0.85rem' }} />
+            <label className="label">Recipe URL</label>
+            <input className="input" placeholder="https://www.allrecipes.com/recipe/..."
+              value={urlInput} onChange={e => setUrlInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleUrlExtract()} />
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn btn-primary" onClick={handlePasteExtract} disabled={loading || !pasteText.trim()}>
-              {loading ? <span className="spinner" /> : <><ChevronRight size={16} /> Extract Recipe</>}
+            <button className="btn btn-primary" onClick={handleUrlExtract} disabled={loading || !urlInput.trim()}>
+              {loading ? <><span className="spinner" /> Extracting...</> : <><ChevronRight size={16} /> Extract Recipe</>}
             </button>
             <button className="btn btn-secondary" onClick={() => setMode(null)}>Back</button>
           </div>

@@ -19,34 +19,15 @@ async function callClaude(systemPrompt, userContent) {
 }
 
 export async function extractRecipeFromUrl(url) {
-  const system = `You are a recipe extraction assistant. Extract recipe data from the given webpage content and return ONLY a valid JSON object with no markdown, no backticks, no explanation. Structure:
-{
-  "title": string,
-  "description": string,
-  "prep_time": number (minutes),
-  "cook_time": number (minutes),
-  "servings": number,
-  "cuisine": string,
-  "tags": string[],
-  "ingredients": [{"name": string, "amount": string, "unit": string, "category": string}],
-  "steps": [{"order": number, "instruction": string}]
-}
-If you cannot extract a field, use null.`;
-
-  const response = await fetch(ANTHROPIC_API, {
+  const response = await fetch('/.netlify/functions/spoonacular', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      fetchUrl: url,
-      model: MODEL,
-      max_tokens: MAX_TOKENS,
-      system,
-    }),
+    body: JSON.stringify({ url }),
   });
-  if (!response.ok) throw new Error(`API error: ${response.status}`);
+  if (!response.ok) throw new Error(`Extraction failed: ${response.status}`);
   const data = await response.json();
-  const text = data.content[0].text;
-  return JSON.parse(text);
+  if (data.error) throw new Error(data.error);
+  return data;
 }
 
 export async function extractRecipeFromImage(base64Image, mediaType) {
