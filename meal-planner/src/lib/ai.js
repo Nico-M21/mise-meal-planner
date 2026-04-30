@@ -1,5 +1,5 @@
 const ANTHROPIC_API = '/.netlify/functions/claude';
-const MODEL = 'claude-sonnet-4-20250514';
+const MODEL = 'claude-sonnet-4-5';
 
 async function callClaude(systemPrompt, userContent) {
   const response = await fetch(ANTHROPIC_API, {

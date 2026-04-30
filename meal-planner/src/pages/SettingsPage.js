@@ -35,7 +35,7 @@ async function detectCategory(ingredientName) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-5',
       max_tokens: 1000,
       system: `You categorize pantry ingredients. Given an ingredient name, return ONLY one of these exact category names, nothing else:
 Oils & Fats
