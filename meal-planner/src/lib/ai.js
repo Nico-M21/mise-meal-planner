@@ -18,7 +18,7 @@ async function callClaude(systemPrompt, userContent) {
 }
 
 export async function extractRecipeFromUrl(url) {
-  const system = `You are a recipe extraction assistant. Extract recipe data from the given URL content and return ONLY a valid JSON object with no markdown, no backticks, no explanation. Structure:
+  const system = `You are a recipe extraction assistant. Extract recipe data from the given webpage content and return ONLY a valid JSON object with no markdown, no backticks, no explanation. Structure:
 {
   "title": string,
   "description": string,
@@ -32,7 +32,19 @@ export async function extractRecipeFromUrl(url) {
 }
 If you cannot extract a field, use null.`;
 
-  const text = await callClaude(system, `Extract the recipe from this URL: ${url}`);
+  const response = await fetch(ANTHROPIC_API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      fetchUrl: url,
+      model: MODEL,
+      max_tokens: 1000,
+      system,
+    }),
+  });
+  if (!response.ok) throw new Error(`API error: ${response.status}`);
+  const data = await response.json();
+  const text = data.content[0].text;
   return JSON.parse(text);
 }
 
