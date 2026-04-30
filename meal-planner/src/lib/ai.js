@@ -1,5 +1,6 @@
 const ANTHROPIC_API = '/.netlify/functions/claude';
 const MODEL = 'claude-sonnet-4-5';
+const MAX_TOKENS = 2000;
 
 async function callClaude(systemPrompt, userContent) {
   const response = await fetch(ANTHROPIC_API, {
@@ -7,7 +8,7 @@ async function callClaude(systemPrompt, userContent) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: MODEL,
-      max_tokens: 1000,
+      max_tokens: MAX_TOKENS,
       system: systemPrompt,
       messages: [{ role: 'user', content: userContent }],
     }),
@@ -38,7 +39,7 @@ If you cannot extract a field, use null.`;
     body: JSON.stringify({
       fetchUrl: url,
       model: MODEL,
-      max_tokens: 1000,
+      max_tokens: MAX_TOKENS,
       system,
     }),
   });
@@ -54,7 +55,7 @@ export async function extractRecipeFromImage(base64Image, mediaType) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: MODEL,
-      max_tokens: 1000,
+      max_tokens: MAX_TOKENS,
       system: `You are a recipe extraction assistant. Extract recipe data from the provided image and return ONLY a valid JSON object with no markdown, no backticks, no explanation. Structure:
 {
   "title": string,
@@ -94,7 +95,8 @@ export async function extractRecipeFromText(text) {
   "ingredients": [{"name": string, "amount": string, "unit": string, "category": string}],
   "steps": [{"order": number, "instruction": string}]
 }`;
-  const extracted = await callClaude(system, text);
+  const truncated = text.slice(0, 6000);
+  const extracted = await callClaude(system, truncated);
   return JSON.parse(extracted);
 }
 
