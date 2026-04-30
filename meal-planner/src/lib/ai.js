@@ -18,7 +18,7 @@ async function callClaude(systemPrompt, userContent) {
   return data.content[0].text;
 }
 
-const SPOONACULAR_KEY = process.env.REACT_APP_SPOONACULAR_KEY;
+const SPOONACULAR_KEY = process.env.REACT_APP_SPOONACULAR_API_KEY;
 
 function mapIngredientCategory(aisle) {
   if (!aisle) return 'Other';
