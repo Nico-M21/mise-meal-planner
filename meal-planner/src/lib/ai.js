@@ -95,14 +95,23 @@ export async function extractRecipeFromText(text) {
   "ingredients": [{"name": string, "amount": string, "unit": string, "category": string}],
   "steps": [{"order": number, "instruction": string}]
 }`;
-  // Find the recipe content — skip navigation/header junk
-  const markers = ["Ingredients", "ingredients", "INGREDIENTS", "Recipe", "Prep Time", "Cook Time"];
+  // Clean the text — strip URLs (especially long ad tracker URLs), markdown links, junk chars
+  const cleaned = text
+    .replace(/https?:\/\/\S{80,}/g, '')
+    .replace(/https?:\/\/\S+/g, '')
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+    .replace(/[▢►]/g, '')
+    .replace(/\s{3,}/g, '\n\n')
+    .trim();
+
+  // Find where the actual recipe starts
+  const markers = ["Ingredients", "ingredients", "INGREDIENTS", "Prep Time", "Cook Time"];
   let start = 0;
   for (const marker of markers) {
-    const idx = text.indexOf(marker);
-    if (idx > 0 && idx < text.length * 0.7) { start = Math.max(0, idx - 200); break; }
+    const idx = cleaned.indexOf(marker);
+    if (idx > 0 && idx < cleaned.length * 0.8) { start = Math.max(0, idx - 300); break; }
   }
-  const truncated = text.slice(start, start + 10000);
+  const truncated = cleaned.slice(start, start + 8000);
   const extracted = await callClaude(system, truncated);
   return JSON.parse(extracted);
 }
