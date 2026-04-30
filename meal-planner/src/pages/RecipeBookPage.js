@@ -173,7 +173,15 @@ export function RecipeBookPage({ refreshTrigger, showToast, onAddToPlan }) {
         </div>
       )}
 
-      {selectedRecipe && <RecipeModal recipe={selectedRecipe} onClose={() => setSelectedRecipe(null)} />}
+      {selectedRecipe && <RecipeModal
+  recipe={selectedRecipe}
+  onClose={() => setSelectedRecipe(null)}
+  showToast={showToast}
+  onSaved={(updated) => {
+    setRecipes(prev => prev.map(r => r.id === updated.id ? updated : r));
+    setSelectedRecipe(updated);
+  }}
+/>}
     </div>
   );
 }
