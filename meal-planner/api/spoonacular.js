@@ -14,53 +14,28 @@ function mapCategory(aisle) {
 
 module.exports = async function (req, res) {
   if (req.method !== 'POST') return res.status(405).send('Method Not Allowed');
-  
   try {
     const { url } = req.body;
     const apiKey = process.env.SPOONACULAR_API_KEY;
-    console.log('API Key present:', !!apiKey, 'Length:', apiKey ? apiKey.length : 0);
-    console.log('URL to extract:', url);
-
-    const encodedUrl = encodeURIComponent(url);
-    const path = `/recipes/extract?apiKey=${apiKey}&url=${encodedUrl}&forceExtraction=false&analyze=false&includeNutrition=false`;
-    console.log('Calling Spoonacular path length:', path.length);
+    const path = `/recipes/extract?apiKey=${apiKey}&url=${encodeURIComponent(url)}&forceExtraction=false&analyze=false&includeNutrition=false`;
 
     const data = await new Promise((resolve, reject) => {
-      const options = {
+      const request = https.request({
         hostname: 'api.spoonacular.com',
-        path: path,
+        path,
         method: 'GET',
         headers: { 'Accept': 'application/json' },
-      };
-
-      const request = https.request(options, (response) => {
+      }, (response) => {
         let body = '';
-        console.log('Spoonacular status:', response.statusCode);
         response.on('data', chunk => body += chunk);
         response.on('end', () => resolve({ status: response.statusCode, body }));
       });
-
-      request.on('error', (err) => {
-        console.log('Request error:', err.message);
-        reject(err);
-      });
-
-      request.setTimeout(8000, () => {
-        console.log('Request timeout');
-        request.destroy();
-        reject(new Error('Timeout'));
-      });
-
+      request.on('error', reject);
+      request.setTimeout(8000, () => { request.destroy(); reject(new Error('Timeout')); });
       request.end();
     });
 
-    console.log('Response status:', data.status);
-    console.log('Response preview:', data.body.slice(0, 200));
-
-    if (data.status !== 200) {
-      return res.status(data.status).json({ error: `Spoonacular returned ${data.status}: ${data.body.slice(0, 200)}` });
-    }
-
+    if (data.status !== 200) return res.status(data.status).json({ error: `Extraction failed` });
     const parsed = JSON.parse(data.body);
     if (parsed.status === 'failure') return res.status(422).json({ error: 'Could not extract recipe' });
 
@@ -84,9 +59,7 @@ module.exports = async function (req, res) {
         instruction: step.step,
       })),
     });
-
   } catch (err) {
-    console.log('Caught error:', err.message);
     res.status(500).json({ error: err.message });
   }
 };

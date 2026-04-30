@@ -260,13 +260,18 @@ export function AddRecipePage({ onSaved, showToast }) {
           </div>
 
           <div className="card">
-            <h3 style={{ fontFamily: 'Playfair Display, serif', marginBottom: 16 }}>Ingredients</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <h3 style={{ fontFamily: 'Playfair Display, serif', marginBottom: 10 }}>Ingredients</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '90px 90px 1fr 110px 28px', gap: 6, marginBottom: 6, padding: '0 2px' }}>
+              {['Amount', 'Unit', 'Ingredient', 'Category', ''].map((h, i) => (
+                <span key={i} style={{ fontSize: '0.72rem', color: 'var(--ink-faint)', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase' }}>{h}</span>
+              ))}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {recipe.ingredients.map((ing, i) => (
-                <div key={i} style={{ display: 'grid', gridTemplateColumns: '70px 70px 1fr 110px 28px', gap: 6, alignItems: 'center' }}>
-                  <input className="input" placeholder="Amt" value={ing.amount} onChange={e => updateIngredient(i, 'amount', e.target.value)} style={{ fontSize: '0.85rem' }} />
-                  <input className="input" placeholder="Unit" value={ing.unit} onChange={e => updateIngredient(i, 'unit', e.target.value)} style={{ fontSize: '0.85rem' }} />
-                  <input className="input" placeholder="Ingredient" value={ing.name} onChange={e => updateIngredient(i, 'name', e.target.value)} style={{ fontSize: '0.85rem' }} />
+                <div key={i} style={{ display: 'grid', gridTemplateColumns: '90px 90px 1fr 110px 28px', gap: 6, alignItems: 'center' }}>
+                  <input className="input" placeholder="1.5" value={ing.amount} onChange={e => updateIngredient(i, 'amount', e.target.value)} style={{ fontSize: '0.88rem' }} />
+                  <input className="input" placeholder="cup" value={ing.unit} onChange={e => updateIngredient(i, 'unit', e.target.value)} style={{ fontSize: '0.88rem' }} />
+                  <input className="input" placeholder="chicken breast" value={ing.name} onChange={e => updateIngredient(i, 'name', e.target.value)} style={{ fontSize: '0.88rem' }} />
                   <select className="input" value={ing.category} onChange={e => updateIngredient(i, 'category', e.target.value)} style={{ fontSize: '0.82rem' }}>
                     {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
