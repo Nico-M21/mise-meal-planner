@@ -15,10 +15,7 @@ async function aiSearch(query, recipes) {
       model: 'claude-sonnet-4-5',
       max_tokens: 1000,
       system: `You are a recipe search assistant. Given a natural language query and a list of saved recipes, return a JSON array of recipe IDs that best match the query. Only return IDs from the provided list. If none match well, return an empty array. Return ONLY a valid JSON array of strings, no markdown, no explanation.`,
-      messages: [{
-        role: 'user',
-        content: `Query: "${query}"\n\nRecipes:\n${JSON.stringify(recipes.map(r => ({ id: r.id, title: r.title, description: r.description, cuisine: r.cuisine, cook_time: r.cook_time, tags: r.tags, ingredients: (r.ingredients || []).slice(0, 5).map(i => i.name) })))}`
-      }],
+      messages: [{ role: 'user', content: `Query: "${query}"\n\nRecipes:\n${JSON.stringify(recipes.map(r => ({ id: r.id, title: r.title, description: r.description, cuisine: r.cuisine, cook_time: r.cook_time, tags: r.tags, ingredients: (r.ingredients || []).slice(0, 5).map(i => i.name) })))}` }],
     }),
   });
   const data = await response.json();
@@ -26,24 +23,29 @@ async function aiSearch(query, recipes) {
   return JSON.parse(result);
 }
 
-export function RecipeBookPage({ refreshTrigger, showToast }) {
+export function RecipeBookPage({ refreshTrigger, showToast, onAddToPlan }) {
   const [recipes, setRecipes] = useState([]);
+  const [wishlist, setWishlist] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [cuisineFilter, setCuisineFilter] = useState('All');
   const [cookTimeFilter, setCookTimeFilter] = useState('');
   const [selectedRecipe, setSelectedRecipe] = useState(null);
-  const [aiResults, setAiResults] = useState(null); // null = no AI search yet
+  const [aiResults, setAiResults] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
-  const debounceRef = useRef(null);
 
-  useEffect(() => { fetchRecipes(); }, [refreshTrigger]);
+  useEffect(() => { fetchRecipes(); fetchWishlist(); }, [refreshTrigger]);
 
   async function fetchRecipes() {
     setLoading(true);
-    const { data, error } = await supabase.from('recipes').select('*').order('created_at', { ascending: false });
-    if (!error) setRecipes(data || []);
+    const { data } = await supabase.from('recipes').select('*').order('created_at', { ascending: false });
+    setRecipes(data || []);
     setLoading(false);
+  }
+
+  async function fetchWishlist() {
+    const { data } = await supabase.from('wishlist').select('recipe_id');
+    setWishlist(new Set((data || []).map(w => w.recipe_id)));
   }
 
   async function handleRate(id, rating) {
@@ -61,6 +63,18 @@ export function RecipeBookPage({ refreshTrigger, showToast }) {
     }
   }
 
+  async function handleWishlist(recipe) {
+    if (wishlist.has(recipe.id)) {
+      await supabase.from('wishlist').delete().eq('recipe_id', recipe.id);
+      setWishlist(prev => { const s = new Set(prev); s.delete(recipe.id); return s; });
+      showToast('Removed from wishlist');
+    } else {
+      await supabase.from('wishlist').insert([{ recipe_id: recipe.id, recipe_title: recipe.title }]);
+      setWishlist(prev => new Set([...prev, recipe.id]));
+      showToast('Saved to wishlist ♥', 'success');
+    }
+  }
+
   async function handleAiSearch() {
     if (!query.trim() || recipes.length === 0) return;
     setAiLoading(true);
@@ -74,78 +88,52 @@ export function RecipeBookPage({ refreshTrigger, showToast }) {
     setAiLoading(false);
   }
 
-  function clearSearch() {
-    setQuery('');
-    setAiResults(null);
-  }
+  function clearSearch() { setQuery(''); setAiResults(null); }
 
-  // Apply filters
   let filtered = recipes;
-
-  // If AI search has results, use those
   if (aiResults !== null) {
     filtered = recipes.filter(r => aiResults.includes(r.id));
   } else if (query.trim()) {
-    // Basic text search while typing (before hitting search)
     filtered = recipes.filter(r =>
       r.title.toLowerCase().includes(query.toLowerCase()) ||
       r.description?.toLowerCase().includes(query.toLowerCase())
     );
   }
-
-  // Apply cuisine filter
-  if (cuisineFilter !== 'All') {
-    filtered = filtered.filter(r => r.cuisine === cuisineFilter);
-  }
-
-  // Apply cook time filter
+  if (cuisineFilter !== 'All') filtered = filtered.filter(r => r.cuisine === cuisineFilter);
   if (cookTimeFilter) {
     const max = parseInt(cookTimeFilter);
-    if (max === 61) {
-      filtered = filtered.filter(r => (r.cook_time || 0) > 60);
-    } else {
-      filtered = filtered.filter(r => ((r.prep_time || 0) + (r.cook_time || 0)) <= max);
-    }
+    if (max === 61) filtered = filtered.filter(r => (r.cook_time || 0) > 60);
+    else filtered = filtered.filter(r => ((r.prep_time || 0) + (r.cook_time || 0)) <= max);
   }
-
-  const isAiActive = aiResults !== null;
 
   return (
     <div>
       <div className="page-header">
         <h1 className="page-title">Recipe Book</h1>
-        <p className="page-subtitle">{recipes.length} saved recipe{recipes.length !== 1 ? 's' : ''}</p>
+        <p className="page-subtitle">{recipes.length} saved recipe{recipes.length !== 1 ? 's' : ''}{wishlist.size > 0 ? ` · ${wishlist.size} wishlisted` : ''}</p>
       </div>
 
-      {/* Search bar */}
       <div style={{ marginBottom: 14 }}>
         <div style={{ display: 'flex', gap: 8 }}>
           <div style={{ position: 'relative', flex: 1 }}>
             <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--ink-faint)' }} />
-            <input
-              className="input"
-              placeholder='Try "quick chicken dinner" or "1 pot meal with beef" or "fancy anniversary dinner"...'
+            <input className="input"
+              placeholder='Try "quick chicken dinner" or "1 pot beef" or "fancy anniversary dinner"...'
               value={query}
               onChange={e => { setQuery(e.target.value); if (aiResults) setAiResults(null); }}
               onKeyDown={e => e.key === 'Enter' && handleAiSearch()}
-              style={{ paddingLeft: 36, paddingRight: query ? 36 : 14 }}
-            />
+              style={{ paddingLeft: 36, paddingRight: query ? 36 : 14 }} />
             {query && (
               <button onClick={clearSearch} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-faint)', display: 'flex' }}>
                 <X size={14} />
               </button>
             )}
           </div>
-          <button
-            className="btn btn-primary"
-            onClick={handleAiSearch}
-            disabled={aiLoading || !query.trim()}
-            style={{ whiteSpace: 'nowrap' }}
-          >
+          <button className="btn btn-primary" onClick={handleAiSearch} disabled={aiLoading || !query.trim()} style={{ whiteSpace: 'nowrap' }}>
             {aiLoading ? <span className="spinner" /> : <><Sparkles size={15} /> Search</>}
           </button>
         </div>
-        {isAiActive && (
+        {aiResults !== null && (
           <div style={{ marginTop: 8, fontSize: '0.82rem', color: 'var(--terracotta)', display: 'flex', alignItems: 'center', gap: 6 }}>
             <Sparkles size={12} />
             AI found {filtered.length} match{filtered.length !== 1 ? 'es' : ''} for "{query}"
@@ -154,7 +142,6 @@ export function RecipeBookPage({ refreshTrigger, showToast }) {
         )}
       </div>
 
-      {/* Filters row */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 24, flexWrap: 'wrap' }}>
         <select className="input" value={cuisineFilter} onChange={e => setCuisineFilter(e.target.value)} style={{ width: 'auto' }}>
           {CUISINES.map(c => <option key={c}>{c}</option>)}
@@ -174,12 +161,13 @@ export function RecipeBookPage({ refreshTrigger, showToast }) {
       ) : (
         <div className="recipe-grid">
           {filtered.map(r => (
-            <RecipeCard
-              key={r.id}
-              recipe={r}
+            <RecipeCard key={r.id} recipe={r}
               onRate={handleRate}
               onDelete={handleDelete}
               onView={setSelectedRecipe}
+              onWishlist={handleWishlist}
+              onAddToPlan={onAddToPlan}
+              isWishlisted={wishlist.has(r.id)}
             />
           ))}
         </div>

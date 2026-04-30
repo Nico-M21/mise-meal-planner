@@ -9,19 +9,26 @@ import { useToast, Toast } from './hooks/useToast';
 
 const NAV_ITEMS = [
   { key: 'recipes', label: 'Recipes', icon: BookOpen },
-  { key: 'planner', label: 'Meal Planner', icon: Calendar },
-  { key: 'add', label: 'Add Recipe', icon: PlusCircle },
+  { key: 'planner', label: 'Planner', icon: Calendar },
+  { key: 'add', label: 'Add', icon: PlusCircle },
   { key: 'settings', label: 'Settings', icon: Settings },
 ];
 
 export default function App() {
   const [page, setPage] = useState('recipes');
   const [recipeRefresh, setRecipeRefresh] = useState(0);
+  const [pendingRecipe, setPendingRecipe] = useState(null);
   const { toast, showToast } = useToast();
 
   function handleRecipeSaved() {
     setRecipeRefresh(n => n + 1);
     setPage('recipes');
+  }
+
+  function handleAddToPlan(recipe) {
+    setPendingRecipe(recipe);
+    setPage('planner');
+    showToast(`Taking ${recipe.title} to your plan`, 'success');
   }
 
   return (
@@ -33,31 +40,19 @@ export default function App() {
         </div>
         <div className="nav-links">
           {NAV_ITEMS.map(({ key, label, icon: Icon }) => (
-            <button
-              key={key}
-              className={`nav-link ${page === key ? 'active' : ''}`}
-              onClick={() => setPage(key)}
-            >
+            <button key={key} className={`nav-link ${page === key ? 'active' : ''}`} onClick={() => setPage(key)}>
               <Icon size={16} />
-              {label}
+              <span className="nav-label">{label}</span>
             </button>
           ))}
         </div>
       </nav>
 
       <main className="main-content">
-        {page === 'recipes' && (
-          <RecipeBookPage refreshTrigger={recipeRefresh} showToast={showToast} />
-        )}
-        {page === 'planner' && (
-          <MealPlannerPage showToast={showToast} />
-        )}
-        {page === 'add' && (
-          <AddRecipePage onSaved={handleRecipeSaved} showToast={showToast} />
-        )}
-        {page === 'settings' && (
-          <SettingsPage showToast={showToast} />
-        )}
+        {page === 'recipes' && <RecipeBookPage refreshTrigger={recipeRefresh} showToast={showToast} onAddToPlan={handleAddToPlan} />}
+        {page === 'planner' && <MealPlannerPage showToast={showToast} pendingRecipe={pendingRecipe} onPendingClear={() => setPendingRecipe(null)} />}
+        {page === 'add' && <AddRecipePage onSaved={handleRecipeSaved} showToast={showToast} />}
+        {page === 'settings' && <SettingsPage showToast={showToast} />}
       </main>
 
       <Toast toast={toast} />
