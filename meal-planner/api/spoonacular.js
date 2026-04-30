@@ -1,24 +1,5 @@
 const https = require('https');
 
-function httpsGet(url) {
-  return new Promise((resolve, reject) => {
-    const parsed = new URL(url);
-    const req = https.request({
-      hostname: parsed.hostname,
-      path: parsed.pathname + parsed.search,
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-    }, (res) => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => resolve({ status: res.statusCode, body: data }));
-    });
-    req.on('error', reject);
-    req.setTimeout(8000, () => { req.destroy(); reject(new Error('Timeout')); });
-    req.end();
-  });
-}
-
 function mapCategory(aisle) {
   if (!aisle) return 'Other';
   const a = aisle.toLowerCase();
@@ -33,38 +14,79 @@ function mapCategory(aisle) {
 
 module.exports = async function (req, res) {
   if (req.method !== 'POST') return res.status(405).send('Method Not Allowed');
+  
   try {
     const { url } = req.body;
     const apiKey = process.env.SPOONACULAR_API_KEY;
     console.log('API Key present:', !!apiKey, 'Length:', apiKey ? apiKey.length : 0);
     console.log('URL to extract:', url);
-    const endpoint = `https://api.spoonacular.com/recipes/extract?apiKey=${apiKey}&url=${encodeURIComponent(url)}&forceExtraction=false&analyze=false&includeNutrition=false`;
-    const result = await httpsGet(endpoint);
-    if (result.status !== 200) return res.status(result.status).json({ error: 'Extraction failed' });
-    const data = JSON.parse(result.body);
-    if (data.status === 'failure') return res.status(422).json({ error: 'Could not extract recipe' });
+
+    const encodedUrl = encodeURIComponent(url);
+    const path = `/recipes/extract?apiKey=${apiKey}&url=${encodedUrl}&forceExtraction=false&analyze=false&includeNutrition=false`;
+    console.log('Calling Spoonacular path length:', path.length);
+
+    const data = await new Promise((resolve, reject) => {
+      const options = {
+        hostname: 'api.spoonacular.com',
+        path: path,
+        method: 'GET',
+        headers: { 'Accept': 'application/json' },
+      };
+
+      const request = https.request(options, (response) => {
+        let body = '';
+        console.log('Spoonacular status:', response.statusCode);
+        response.on('data', chunk => body += chunk);
+        response.on('end', () => resolve({ status: response.statusCode, body }));
+      });
+
+      request.on('error', (err) => {
+        console.log('Request error:', err.message);
+        reject(err);
+      });
+
+      request.setTimeout(8000, () => {
+        console.log('Request timeout');
+        request.destroy();
+        reject(new Error('Timeout'));
+      });
+
+      request.end();
+    });
+
+    console.log('Response status:', data.status);
+    console.log('Response preview:', data.body.slice(0, 200));
+
+    if (data.status !== 200) {
+      return res.status(data.status).json({ error: `Spoonacular returned ${data.status}: ${data.body.slice(0, 200)}` });
+    }
+
+    const parsed = JSON.parse(data.body);
+    if (parsed.status === 'failure') return res.status(422).json({ error: 'Could not extract recipe' });
 
     res.json({
-      title: data.title || '',
-      description: data.summary ? data.summary.replace(/<[^>]+>/g, '').slice(0, 300) : '',
-      prep_time: data.preparationMinutes > 0 ? data.preparationMinutes : null,
-      cook_time: data.cookingMinutes > 0 ? data.cookingMinutes : (data.readyInMinutes || null),
-      servings: data.servings || null,
-      cuisine: data.cuisines?.[0] || '',
-      tags: [...(data.dishTypes || []), ...(data.diets || [])],
-      source_url: data.sourceUrl || url,
-      ingredients: (data.extendedIngredients || []).map(ing => ({
+      title: parsed.title || '',
+      description: parsed.summary ? parsed.summary.replace(/<[^>]+>/g, '').slice(0, 300) : '',
+      prep_time: parsed.preparationMinutes > 0 ? parsed.preparationMinutes : null,
+      cook_time: parsed.cookingMinutes > 0 ? parsed.cookingMinutes : (parsed.readyInMinutes || null),
+      servings: parsed.servings || null,
+      cuisine: parsed.cuisines?.[0] || '',
+      tags: [...(parsed.dishTypes || []), ...(parsed.diets || [])],
+      source_url: parsed.sourceUrl || url,
+      ingredients: (parsed.extendedIngredients || []).map(ing => ({
         name: ing.name || '',
         amount: ing.amount ? String(ing.amount) : '',
         unit: ing.unit || '',
         category: mapCategory(ing.aisle),
       })),
-      steps: (data.analyzedInstructions?.[0]?.steps || []).map(step => ({
+      steps: (parsed.analyzedInstructions?.[0]?.steps || []).map(step => ({
         order: step.number,
         instruction: step.step,
       })),
     });
+
   } catch (err) {
+    console.log('Caught error:', err.message);
     res.status(500).json({ error: err.message });
   }
 };
