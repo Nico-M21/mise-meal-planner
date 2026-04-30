@@ -28,7 +28,7 @@ export default function App() {
     <div className="app-shell">
       <nav className="nav">
         <div className="nav-logo">
-          Mise
+          Monroig
           <span>family meal planner</span>
         </div>
         <div className="nav-links">
