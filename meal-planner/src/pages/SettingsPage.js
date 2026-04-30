@@ -31,7 +31,7 @@ const DEFAULT_STAPLES = [
 ];
 
 async function detectCategory(ingredientName) {
-  const response = await fetch('/.netlify/functions/claude', {
+  const response = await fetch('/api/claude', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
