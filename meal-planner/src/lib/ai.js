@@ -1,4 +1,4 @@
-const ANTHROPIC_API = '/.netlify/functions/claude';
+const ANTHROPIC_API = '/api/claude';
 const MODEL = 'claude-sonnet-4-5';
 const MAX_TOKENS = 3000;
 
@@ -18,47 +18,16 @@ async function callClaude(systemPrompt, userContent) {
   return data.content[0].text;
 }
 
-const SPOONACULAR_KEY = window.__SPOONACULAR_KEY__;
-
-function mapIngredientCategory(aisle) {
-  if (!aisle) return 'Other';
-  const a = aisle.toLowerCase();
-  if (a.includes('produce') || a.includes('vegetable') || a.includes('fruit')) return 'Produce';
-  if (a.includes('meat') || a.includes('seafood') || a.includes('poultry')) return 'Protein';
-  if (a.includes('dairy') || a.includes('cheese') || a.includes('milk') || a.includes('egg')) return 'Dairy';
-  if (a.includes('oil') || a.includes('baking') || a.includes('spice') || a.includes('condiment') || a.includes('pasta') || a.includes('grain')) return 'Pantry';
-  if (a.includes('frozen')) return 'Frozen';
-  if (a.includes('beverage')) return 'Beverages';
-  return 'Other';
-}
-
 export async function extractRecipeFromUrl(url) {
-  const endpoint = `https://api.spoonacular.com/recipes/extract?apiKey=${SPOONACULAR_KEY}&url=${encodeURIComponent(url)}&forceExtraction=false&analyze=false&includeNutrition=false`;
-  const response = await fetch(endpoint);
-  if (!response.ok) throw new Error(`Spoonacular error: ${response.status}`);
+  const response = await fetch('/api/spoonacular', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url }),
+  });
+  if (!response.ok) throw new Error(`Extraction failed: ${response.status}`);
   const data = await response.json();
-  if (data.status === 'failure') throw new Error('Could not extract recipe from this URL');
-
-  return {
-    title: data.title || '',
-    description: data.summary ? data.summary.replace(/<[^>]+>/g, '').slice(0, 300) : '',
-    prep_time: data.preparationMinutes > 0 ? data.preparationMinutes : null,
-    cook_time: data.cookingMinutes > 0 ? data.cookingMinutes : (data.readyInMinutes || null),
-    servings: data.servings || null,
-    cuisine: data.cuisines?.[0] || '',
-    tags: [...(data.dishTypes || []), ...(data.diets || [])],
-    source_url: data.sourceUrl || url,
-    ingredients: (data.extendedIngredients || []).map(ing => ({
-      name: ing.name || ing.originalName || '',
-      amount: ing.amount ? String(ing.amount) : '',
-      unit: ing.unit || '',
-      category: mapIngredientCategory(ing.aisle),
-    })),
-    steps: (data.analyzedInstructions?.[0]?.steps || []).map(step => ({
-      order: step.number,
-      instruction: step.step,
-    })),
-  };
+  if (data.error) throw new Error(data.error);
+  return data;
 }
 
 export async function extractRecipeFromImage(base64Image, mediaType) {
