@@ -8,7 +8,7 @@ const CUISINES = ['All', 'American', 'Mexican', 'Italian', 'Asian', 'Thai', 'Chi
 const COOK_TIMES = [{ label: 'Any time', value: '' }, { label: 'Under 30 min', value: 30 }, { label: 'Under 45 min', value: 45 }, { label: 'Under 60 min', value: 60 }, { label: 'Over 60 min', value: 61 }];
 
 async function aiSearch(query, recipes) {
-  const response = await fetch('/.netlify/functions/claude', {
+  const response = await fetch('/api/claude', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
