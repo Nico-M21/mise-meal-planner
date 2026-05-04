@@ -70,7 +70,7 @@ export function MealPlannerPage({ showToast, pendingRecipe, onPendingClear }) {
       setMeals(withServings);
       setStep('plan');
     } catch (e) {
-      showToast('Failed to generate meal plan. Try again.', 'error');
+      showToast(e.message?.includes('timeout') ? 'Request timed out — try fewer meals or simpler filters' : 'Failed to generate meal plan. Try again.', 'error');
     }
     setLoading(false);
   }
@@ -84,7 +84,7 @@ export function MealPlannerPage({ showToast, pendingRecipe, onPendingClear }) {
       updated[index] = { ...newMeal, targetServings: newMeal.servings || 2 };
       setMeals(updated);
     } catch (e) {
-      showToast('Swap failed. Try again.', 'error');
+      showToast(e.message?.includes('timeout') ? 'Request timed out — try again' : 'Swap failed. Try again.', 'error');
     }
     setSwapping(null);
   }
@@ -126,11 +126,22 @@ export function MealPlannerPage({ showToast, pendingRecipe, onPendingClear }) {
     setMeals(prev => prev.filter((_, i) => i !== index));
   }
 
-  function buildList() {
+  async function buildList() {
     const list = buildGroceryList(meals, pantryStaples);
     setGroceryList(list);
     setCheckedItems({});
     setStep('grocery');
+    // Save grocery list to Supabase so it persists
+    try {
+      const week = new Date().toISOString().split('T')[0];
+      await supabase.from('grocery_lists').upsert([{
+        week_of: week,
+        items: list,
+        meal_titles: meals.map(m => m.title),
+      }], { onConflict: 'week_of' });
+    } catch (e) {
+      // Non-critical — list still shows even if save fails
+    }
   }
 
   function toggleChecked(key) {

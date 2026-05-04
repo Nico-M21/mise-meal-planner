@@ -20,7 +20,12 @@ async function aiSearch(query, recipes) {
   });
   const data = await response.json();
   const result = data.content[0].text.trim();
-  return JSON.parse(result);
+  try {
+    const clean = result.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+    return JSON.parse(clean);
+  } catch (e) {
+    return [];
+  }
 }
 
 export function RecipeBookPage({ refreshTrigger, showToast, onAddToPlan }) {
