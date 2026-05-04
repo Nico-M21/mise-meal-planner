@@ -50,13 +50,6 @@ export function AddRecipePage({ onSaved, showToast }) {
     if (!file) return;
     setLoading(true);
     try {
-      if (file.type.startsWith('video/')) {
-        const extracted = await extractRecipeFromText(`Video file: ${file.name}`);
-        setRecipe({ ...BLANK_RECIPE, ...extracted });
-        setLoading(false);
-        return;
-      }
-
       // Compress image before sending to stay under 4MB limit
       const compressed = await compressImage(file, 1200, 0.7);
       const base64 = compressed.split(',')[1];
@@ -162,7 +155,7 @@ export function AddRecipePage({ onSaved, showToast }) {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 16, maxWidth: 600 }}>
           {[
             { key: 'url', icon: <Link2 size={28} />, label: 'From a Website', sub: 'Copy & paste recipe text' },
-            { key: 'upload', icon: <Upload size={28} />, label: 'Photo or Video', sub: 'AI extracts the recipe' },
+            { key: 'upload', icon: <Upload size={28} />, label: 'Upload a Photo', sub: 'AI extracts the recipe' },
             { key: 'manual', icon: <PenLine size={28} />, label: 'Type it in', sub: 'Manual entry from scratch' },
           ].map(opt => (
             <button key={opt.key} className="card"
@@ -225,8 +218,8 @@ export function AddRecipePage({ onSaved, showToast }) {
             <label style={{ display: 'block', padding: 40, cursor: 'pointer', border: '2px dashed var(--border)', borderRadius: 8 }}>
               <Upload size={32} style={{ color: 'var(--terracotta)', margin: '0 auto 12px' }} />
               <p style={{ fontWeight: 500, marginBottom: 4 }}>Drop a file or click to browse</p>
-              <p style={{ fontSize: '0.82rem', color: 'var(--ink-faint)' }}>JPG, PNG, MP4, MOV supported</p>
-              <input type="file" accept="image/*,video/*" onChange={handleFileUpload} style={{ display: 'none' }} />
+              <p style={{ fontSize: '0.82rem', color: 'var(--ink-faint)' }}>JPG, PNG, HEIC supported</p>
+              <input type="file" accept="image/*" onChange={handleFileUpload} style={{ display: 'none' }} />
             </label>
           )}
           <button className="btn btn-secondary" onClick={() => setMode(null)} style={{ marginTop: 16 }}>Back</button>
