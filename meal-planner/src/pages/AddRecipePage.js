@@ -50,24 +50,42 @@ export function AddRecipePage({ onSaved, showToast }) {
     if (!file) return;
     setLoading(true);
     try {
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const base64 = reader.result.split(',')[1];
-        const mediaType = file.type;
-        let extracted;
-        if (mediaType.startsWith('image/')) {
-          extracted = await extractRecipeFromImage(base64, mediaType);
-        } else {
-          extracted = await extractRecipeFromText(`Video file: ${file.name}`);
-        }
+      if (file.type.startsWith('video/')) {
+        const extracted = await extractRecipeFromText(`Video file: ${file.name}`);
         setRecipe({ ...BLANK_RECIPE, ...extracted });
         setLoading(false);
-      };
-      reader.readAsDataURL(file);
-    } catch (e) {
-      showToast('Could not extract recipe from file.', 'error');
+        return;
+      }
+
+      // Compress image before sending to stay under 4MB limit
+      const compressed = await compressImage(file, 1200, 0.7);
+      const base64 = compressed.split(',')[1];
+      const extracted = await extractRecipeFromImage(base64, 'image/jpeg');
+      setRecipe({ ...BLANK_RECIPE, ...extracted });
+      setLoading(false);
+    } catch (err) {
+      showToast('Could not extract recipe from image.', 'error');
       setLoading(false);
     }
+  }
+
+  function compressImage(file, maxWidth, quality) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        const scale = Math.min(1, maxWidth / img.width);
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(url);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = reject;
+      img.src = url;
+    });
   }
 
   function handleManual() {
