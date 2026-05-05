@@ -18,6 +18,8 @@ export function AddRecipePage({ onSaved, showToast }) {
   const [loading, setLoading] = useState(false);
   const [urlInput, setUrlInput] = useState('');
   const [pasteText, setPasteText] = useState('');
+  const [showPaste, setShowPaste] = useState(false);
+  const [pasteText, setPasteText] = useState('');
   const [recipe, setRecipe] = useState(null);
   const [saving, setSaving] = useState(false);
 
@@ -37,6 +39,19 @@ export function AddRecipePage({ onSaved, showToast }) {
     if (!pasteText.trim()) return;
     setLoading(true);
     try {
+      const extracted = await extractRecipeFromText(pasteText.trim());
+      setRecipe({ ...BLANK_RECIPE, ...extracted, source_url: urlInput.trim() });
+    } catch (e) {
+      showToast('Could not extract recipe. Try manual entry.', 'error');
+    }
+    setLoading(false);
+  }
+
+  async function handlePasteExtract() {
+    if (!pasteText.trim()) return;
+    setLoading(true);
+    try {
+
       const extracted = await extractRecipeFromText(pasteText.trim());
       setRecipe({ ...BLANK_RECIPE, ...extracted, source_url: urlInput.trim() });
     } catch (e) {
@@ -156,6 +171,7 @@ export function AddRecipePage({ onSaved, showToast }) {
           {[
             { key: 'url', icon: <Link2 size={28} />, label: 'From a Website', sub: 'Copy & paste recipe text' },
             { key: 'upload', icon: <Upload size={28} />, label: 'Upload a Photo', sub: 'AI extracts the recipe' },
+            { key: 'paste', icon: <PenLine size={28} />, label: 'Paste Text', sub: 'For Substack, paywalled sites' },
             { key: 'manual', icon: <PenLine size={28} />, label: 'Type it in', sub: 'Manual entry from scratch' },
           ].map(opt => (
             <button key={opt.key} className="card"
@@ -190,8 +206,54 @@ export function AddRecipePage({ onSaved, showToast }) {
               value={urlInput} onChange={e => setUrlInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleUrlExtract()} />
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
             <button className="btn btn-primary" onClick={handleUrlExtract} disabled={loading || !urlInput.trim()}>
+              {loading ? <><span className="spinner" /> Extracting...</> : <><ChevronRight size={16} /> Extract Recipe</>}
+            </button>
+            <button className="btn btn-secondary" onClick={() => setMode(null)}>Back</button>
+          </div>
+          <button className="btn btn-ghost btn-sm" onClick={() => setShowPaste(!showPaste)} style={{ color: 'var(--ink-faint)', fontSize: '0.82rem' }}>
+            {showPaste ? '▲ Hide' : '▼ Site not working? Paste the text instead'}
+          </button>
+          {showPaste && (
+            <div style={{ marginTop: 12 }}>
+              <label className="label">Paste the recipe page text here</label>
+              <textarea className="input" rows={6} placeholder="Open the recipe page, press Ctrl+A then Ctrl+C to copy, paste here..." value={pasteText} onChange={e => setPasteText(e.target.value)} style={{ resize: 'vertical', fontSize: '0.85rem', marginBottom: 8 }} />
+              <button className="btn btn-primary btn-sm" onClick={handlePasteExtract} disabled={loading || !pasteText.trim()}>
+                {loading ? <span className="spinner" /> : 'Extract from pasted text'}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Paste mode
+  if (mode === 'paste' && !recipe) {
+    return (
+      <div>
+        <div className="page-header">
+          <h1 className="page-title">Paste Recipe Text</h1>
+          <p className="page-subtitle">For Substack, paywalled, or tricky sites</p>
+        </div>
+        <div className="card" style={{ maxWidth: 560 }}>
+          <div style={{ background: 'var(--gold-pale)', border: '1px solid var(--gold)', borderRadius: 8, padding: '12px 14px', marginBottom: 16, fontSize: '0.85rem', color: 'var(--ink-light)', lineHeight: 1.7 }}>
+            <strong>How to do it:</strong><br />
+            1. Open the recipe page<br />
+            2. Press <strong>Ctrl+A</strong> to select all, then <strong>Ctrl+C</strong> to copy<br />
+            3. Paste below with <strong>Ctrl+V</strong>
+          </div>
+          <div className="form-group" style={{ marginBottom: 12 }}>
+            <label className="label">Recipe URL (optional)</label>
+            <input className="input" placeholder="https://..." value={urlInput} onChange={e => setUrlInput(e.target.value)} />
+          </div>
+          <div className="form-group" style={{ marginBottom: 16 }}>
+            <label className="label">Paste recipe text *</label>
+            <textarea className="input" rows={8} placeholder="Paste the page text here..." value={pasteText} onChange={e => setPasteText(e.target.value)} style={{ resize: 'vertical', fontSize: '0.85rem' }} />
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-primary" onClick={handlePasteExtract} disabled={loading || !pasteText.trim()}>
               {loading ? <><span className="spinner" /> Extracting...</> : <><ChevronRight size={16} /> Extract Recipe</>}
             </button>
             <button className="btn btn-secondary" onClick={() => setMode(null)}>Back</button>
