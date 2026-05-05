@@ -19,7 +19,6 @@ export function AddRecipePage({ onSaved, showToast }) {
   const [urlInput, setUrlInput] = useState('');
   const [pasteText, setPasteText] = useState('');
   const [showPaste, setShowPaste] = useState(false);
-  const [pasteText, setPasteText] = useState('');
   const [recipe, setRecipe] = useState(null);
   const [saving, setSaving] = useState(false);
 
